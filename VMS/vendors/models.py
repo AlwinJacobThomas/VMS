@@ -1,6 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save,pre_save
 from django.dispatch import receiver,Signal
 
 # Create your models here.
@@ -73,9 +73,14 @@ class HistoricalPerformance(models.Model):
 
 @receiver(post_save, sender=PurchaseOrder)
 def update_vendor_on_time_delivery_rate(sender, instance, created, **kwargs):
-    if instance.status == 'completed':
+        
+    if instance.status == 'completed' and instance.quality_rating is not None:
         vendor = instance.vendor
         completed_orders = PurchaseOrder.objects.filter(vendor=vendor, status='completed')
+        #quality_rating_avg calculation
+        quality_rating_avg = completed_orders.aggregate(models.Avg('quality_rating'))['quality_rating__avg']
+        vendor.quality_rating_avg = quality_rating_avg
+        #on_time_delivery_rate calculation
         on_time_orders = completed_orders.filter(delivery_date__lte=instance.delivery_date)
         if completed_orders.count() > 0:
             on_time_delivery_rate = (on_time_orders.count() / completed_orders.count()) * 100
@@ -83,4 +88,50 @@ def update_vendor_on_time_delivery_rate(sender, instance, created, **kwargs):
             on_time_delivery_rate = 0
         vendor.on_time_delivery_rate = on_time_delivery_rate
         vendor.save()
-post_save.connect(update_vendor_on_time_delivery_rate, sender=PurchaseOrder)        
+        
+    #avg_response_time
+    if instance.status == 'completed' and instance.acknowledgment_date:
+        vendor = instance.vendor
+        completed_orders = PurchaseOrder.objects.filter(vendor=vendor, status='completed', acknowledgment_date__isnull=False)
+        #avg respo time calculation
+        total_response_time = sum((po.acknowledgment_date - po.issue_date).total_seconds() for po in completed_orders)
+        total_orders_count = completed_orders.count()
+      
+        if total_orders_count > 0:
+            average_response_time = total_response_time / total_orders_count
+            
+        else:
+            average_response_time = None
+        vendor.average_response_time = average_response_time
+        
+        #on_time_delivery_rate calculation
+        on_time_orders = completed_orders.filter(delivery_date__lte=instance.delivery_date)
+        if completed_orders.count() > 0:
+            on_time_delivery_rate = (on_time_orders.count() / completed_orders.count()) * 100
+        else:
+            on_time_delivery_rate = 0
+        vendor.on_time_delivery_rate = on_time_delivery_rate
+        vendor.save()    
+         
+post_save.connect(update_vendor_on_time_delivery_rate, sender=PurchaseOrder)
+
+@receiver(pre_save, sender=PurchaseOrder)
+def update_fulfillment_rate(sender, instance, **kwargs):
+    # Check if the status has changed and the instance is not being created for the first time
+    if instance.pk and PurchaseOrder.objects.filter(pk=instance.pk).exists():
+        old_instance = PurchaseOrder.objects.get(pk=instance.pk)
+        if instance.status != old_instance.status:
+            vendor = instance.vendor
+            completed_orders = PurchaseOrder.objects.filter(vendor=vendor, status='completed')
+            # Count the number of successfully fulfilled POs
+            successful_orders_count = completed_orders.filter(quality_rating__isnull=False).count()
+            # Total number of POs issued to the vendor
+            total_orders_count = completed_orders.count()
+            # Calculate fulfillment rate
+            if total_orders_count > 0:
+                fulfillment_rate = (successful_orders_count / total_orders_count) * 100
+            else:
+                fulfillment_rate = 0
+            # Update vendor's fulfillment rate
+            vendor.fulfillment_rate = fulfillment_rate
+            vendor.save()        

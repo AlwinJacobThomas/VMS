@@ -69,6 +69,18 @@ class PurchaseOrderOperationsAPIView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def put(self, request, po_id):
+        # Retrieve the purchase order
+        purchase_order = get_object_or_404(PurchaseOrder, pk=po_id)
+        
+        # Change the status to 'pending'
+        purchase_order.status = 'pending'
+      
+        purchase_order.save()
+        
+        # Serialize and return the updated purchase order
+        serializer = PurchaseOrderSerializer(purchase_order)
+        return Response(serializer.data)
     def delete(self, request, po_id):
         purchase_order = get_object_or_404(PurchaseOrder, pk=po_id)
         purchase_order.delete()
@@ -76,9 +88,7 @@ class PurchaseOrderOperationsAPIView(APIView):
     # Endpoint to acknowledge purchase order
     def post(self, request, po_id):
         purchase_order = get_object_or_404(PurchaseOrder, pk=po_id)
-        print(purchase_order.status)
         purchase_order.status = 'completed'
-        print(purchase_order.status)
         purchase_order.acknowledgment_date = timezone.now()
         purchase_order.save()
         return Response({'message': 'Purchase order acknowledged successfully'}, status=status.HTTP_200_OK)
