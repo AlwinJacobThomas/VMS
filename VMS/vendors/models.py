@@ -2,6 +2,7 @@ from django.db import models,transaction
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models.signals import post_save,pre_save
 from django.dispatch import receiver,Signal
+from django.utils import timezone
 
 # Create your models here.
 class Vendor(models.Model):
@@ -61,10 +62,10 @@ class PurchaseOrder(models.Model):
 class HistoricalPerformance(models.Model):
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE)
     date = models.DateTimeField(auto_now_add=True)
-    on_time_delivery_rate = models.FloatField(validators=[MinValueValidator(0.0), MaxValueValidator(100.0)])
-    quality_rating_avg = models.FloatField(validators=[MinValueValidator(0.0), MaxValueValidator(5.0)])
-    average_response_time = models.FloatField()
-    fulfillment_rate = models.FloatField(validators=[MinValueValidator(0.0), MaxValueValidator(100.0)])
+    on_time_delivery_rate = models.FloatField(default=0.0,null=True,blank=True)
+    quality_rating_avg = models.FloatField(default=0.0,null=True,blank=True)
+    average_response_time = models.FloatField(default=0.0,null=True,blank=True)
+    fulfillment_rate = models.FloatField(default=0.0,null=True,blank=True)
 
     def __str__(self):
         return f"{self.vendor.name} - {self.date}"
