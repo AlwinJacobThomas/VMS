@@ -9,7 +9,7 @@ urlpatterns = [
     #purchase orders
     path('purchase_orders/', purchase_orders, name='purchase_orders'),
     path('purchase_orders/<str:po_id>/', purchase_order_operations, name='purchase_order_operations'),
-    
+    path('purchase_orders/<str:po_id>/acknowledge/', purchase_order_acknowledge, name='purchase_order_acknowledge'),
     #vendor performance
     path('vendors/<str:vendor_id>/performance/', retrieve_vp, name='retrieve_vendor_performance'),
 ]

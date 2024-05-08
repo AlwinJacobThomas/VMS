@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models,transaction
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models.signals import post_save,pre_save
 from django.dispatch import receiver,Signal
@@ -60,7 +60,7 @@ class PurchaseOrder(models.Model):
 
 class HistoricalPerformance(models.Model):
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE)
-    date = models.DateTimeField()
+    date = models.DateTimeField(auto_now_add=True)
     on_time_delivery_rate = models.FloatField(validators=[MinValueValidator(0.0), MaxValueValidator(100.0)])
     quality_rating_avg = models.FloatField(validators=[MinValueValidator(0.0), MaxValueValidator(5.0)])
     average_response_time = models.FloatField()
@@ -72,7 +72,7 @@ class HistoricalPerformance(models.Model):
 # Signal handling function
 
 @receiver(post_save, sender=PurchaseOrder)
-def update_vendor_on_time_delivery_rate(sender, instance, created, **kwargs):
+def update_matrices(sender, instance, created, **kwargs):
         
     if instance.status == 'completed' and instance.quality_rating is not None:
         vendor = instance.vendor
@@ -88,7 +88,16 @@ def update_vendor_on_time_delivery_rate(sender, instance, created, **kwargs):
             on_time_delivery_rate = 0
         vendor.on_time_delivery_rate = on_time_delivery_rate
         vendor.save()
-        
+    
+        # Store historical data
+        with transaction.atomic():
+            HistoricalPerformance.objects.create(
+                vendor=vendor,
+                on_time_delivery_rate=vendor.on_time_delivery_rate,
+                quality_rating_avg=vendor.quality_rating_avg,
+                average_response_time=vendor.average_response_time,
+                fulfillment_rate=vendor.fulfillment_rate
+            )
     #avg_response_time
     if instance.status == 'completed' and instance.acknowledgment_date:
         vendor = instance.vendor
@@ -111,9 +120,18 @@ def update_vendor_on_time_delivery_rate(sender, instance, created, **kwargs):
         else:
             on_time_delivery_rate = 0
         vendor.on_time_delivery_rate = on_time_delivery_rate
-        vendor.save()    
-         
-post_save.connect(update_vendor_on_time_delivery_rate, sender=PurchaseOrder)
+        vendor.save()
+        
+        # Store historical data
+        with transaction.atomic():
+            HistoricalPerformance.objects.create(
+                vendor=vendor,
+                on_time_delivery_rate=vendor.on_time_delivery_rate,
+                quality_rating_avg=vendor.quality_rating_avg,
+                average_response_time=vendor.average_response_time,
+                fulfillment_rate=vendor.fulfillment_rate
+            )    
+post_save.connect(update_matrices, sender=PurchaseOrder)
 
 @receiver(pre_save, sender=PurchaseOrder)
 def update_fulfillment_rate(sender, instance, **kwargs):
@@ -134,4 +152,14 @@ def update_fulfillment_rate(sender, instance, **kwargs):
                 fulfillment_rate = 0
             # Update vendor's fulfillment rate
             vendor.fulfillment_rate = fulfillment_rate
-            vendor.save()        
+            vendor.save()
+            
+            # Store historical data
+            with transaction.atomic():
+                HistoricalPerformance.objects.create(
+                    vendor=vendor,
+                    on_time_delivery_rate=vendor.on_time_delivery_rate,
+                    quality_rating_avg=vendor.quality_rating_avg,
+                    average_response_time=vendor.average_response_time,
+                    fulfillment_rate=vendor.fulfillment_rate
+                )        

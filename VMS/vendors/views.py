@@ -85,18 +85,22 @@ class PurchaseOrderOperationsAPIView(APIView):
         purchase_order = get_object_or_404(PurchaseOrder, pk=po_id)
         purchase_order.delete()
         return Response({'message': 'Purchase order deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
-    # Endpoint to acknowledge purchase order
+    
+    
+    
+purchase_order_operations = PurchaseOrderOperationsAPIView.as_view()
+
+# Endpoint to acknowledge purchase order
+class PurchaseOrderAcknowledgeAPIView(APIView):
     def post(self, request, po_id):
         purchase_order = get_object_or_404(PurchaseOrder, pk=po_id)
         purchase_order.status = 'completed'
         purchase_order.acknowledgment_date = timezone.now()
         purchase_order.save()
         return Response({'message': 'Purchase order acknowledged successfully'}, status=status.HTTP_200_OK)
-    
-purchase_order_operations = PurchaseOrderOperationsAPIView.as_view()
+purchase_order_acknowledge = PurchaseOrderAcknowledgeAPIView.as_view()
 
 # Vendor Performance Evaluation
-
 class RetrieveVendorPerformanceAPIView(APIView):
     def get(self, request, vendor_id):
         vendor = get_object_or_404(Vendor, pk=vendor_id)
